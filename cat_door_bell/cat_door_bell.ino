@@ -26,11 +26,15 @@ RCSwitch mySwitch = RCSwitch();
 const int TRANSMIT_PIN = 12;
 const int RECEIVE_PIN = 2;
 
-// Pulse length and code
-unsigned int bell_bit_length = 0;
-unsigned long bell_code = 0;
-unsigned int pulse_length = 0;
-unsigned int protocol = 0;
+// RC-Switch data
+struct BellData {
+  unsigned int bell_bit_length = 0;
+  unsigned long bell_code = 0;
+  unsigned int pulse_length = 0;
+  unsigned int protocol = 0;
+};
+
+BellData bellData;
 
 void setup() {
 
@@ -56,13 +60,16 @@ void setup() {
 
 void loop() {
   checkButtons();
+  checkTrigger();
+}
+
+void checkTrigger()
+{
+  static long last_trigger = millis();
+  static long time_buffer = 0;
+  
   if (digitalRead(PIR_PIN)) {
-    
-    // Avoid false positive on initial run
-    if (last_trigger == 0) {
-      last_trigger = millis();
-    }
-      
+
     // Check if new trigger is outside of given time frame (TRIGGER_THRESHOLD) thus a new incindent
     if ((millis() - last_trigger) >= TRIGGER_THRESHOLD)
     {
@@ -75,17 +82,18 @@ void loop() {
     {
       Serial.println("DING DONG!");
 
-      // Ring door bell with code caught by rc-switch ReceiveDemoAdvanced
       Serial.print("bell code ");
-      Serial.println(bell_code);
+      Serial.println(bellData.bell_code);
       Serial.print("bit length ");
-      Serial.println(bell_bit_length);
+      Serial.println(bellData.bell_bit_length);
       Serial.print("pulse length ");
-      Serial.println(pulse_length);
+      Serial.println(bellData.pulse_length);
       Serial.print("protocol ");
-      Serial.println(protocol);
+      Serial.println(bellData.protocol);
+      
+      // Ring door bell with code caught by copyKeys()
       digitalWrite(STATUS_LED, HIGH);
-      mySwitch.send(bell_code, bell_bit_length);
+      mySwitch.send(bellData.bell_code, bellData.bell_bit_length);
       
       // Reset timers
       time_buffer = 0;
@@ -113,18 +121,18 @@ bool copyKeys()
     if (mySwitch.available())
     {
       // Set protocol
-      protocol = mySwitch.getReceivedProtocol();
-      mySwitch.setProtocol(protocol);
+      bellData.protocol = mySwitch.getReceivedProtocol();
+      mySwitch.setProtocol(bellData.protocol);
 
       // Bell code
-      bell_code = mySwitch.getReceivedValue();
+      bellData.bell_code = mySwitch.getReceivedValue();
 
       // Bell bit length
-      bell_bit_length = mySwitch.getReceivedBitlength();
+      bellData.bell_bit_length = mySwitch.getReceivedBitlength();
       
       // Optional set pulse length.
-      pulse_length = mySwitch.getReceivedDelay();
-      mySwitch.setPulseLength(pulse_length);
+      bellData.pulse_length = mySwitch.getReceivedDelay();
+      mySwitch.setPulseLength(bellData.pulse_length);
 
       mySwitch.resetAvailable();
       
