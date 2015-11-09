@@ -1,23 +1,22 @@
 #include <RCSwitch.h> // Library for sending/receiving RF signals
 #include <buttons.h> // Button library
 #include <EEPROM.h> // For saving settings
+#include "LowPower.h" // Sleep between battles
 
 // Programming button
 Button programButton;
-const int PRG_PIN= 3;
+const int PRG_PIN= 4;
 const int STATUS_LED = 8;
-const int BOOST_POWER_PIN = 10;
+const int RECEIVER_POWER_PIN = 10;
 
-// PIR sensor pin
-const int PIR_PIN = 4;
-
-// FOR DEBUG READ FURTHER DOWN
-// This is because the PIR sends a repeated continous signal on activity 
-long TRIGGER_THRESHOLD = 30000; //30 seconds
+// PIR sensor pins
+const int PIR_PIN = 3;
+unsigned short interruptPin = digitalPinToInterrupt(PIR_PIN);
 
 // TRIGGER_THRESHOLD sets how long we should wait before we trigger the door bell
 // A human (with good intensions:) would probably have pushed the button by now
-//long TRIGGER_THRESHOLD = 90000; // 1.5 minutes
+const long TRIGGER_THRESHOLD = 30000; //30 seconds for development
+//const long TRIGGER_THRESHOLD = 90000; // 1.5 minutes
 
 // timer variables
 long last_trigger = 0;
@@ -27,6 +26,7 @@ long time_buffer = 0;
 RCSwitch mySwitch = RCSwitch();
 const int TRANSMIT_PIN = 12;
 const int RECEIVE_PIN = 2; // Don't change. There doesn't seem to be a way to set this in rc-switch
+const int TRANSMITTER_POWER_PIN = 11;
 
 // RC-Switch data
 struct BellData {
@@ -39,9 +39,9 @@ struct BellData {
 // Storage of data
 BellData settings;
 
-// Status of settings
+// Settings toggle
 bool got_settings = false;
-
+  
 void setup() {
 
   Serial.begin(9600);
@@ -50,9 +50,11 @@ void setup() {
   pinMode(TRANSMIT_PIN, OUTPUT);
   pinMode(RECEIVE_PIN, INPUT);
 
-  // Set pinmode and make sure transmitter doesn't get unnecessary power.
-  pinMode(BOOST_POWER_PIN, OUTPUT);
-  digitalWrite(BOOST_POWER_PIN, LOW);
+  // Set pinmode and make sure transmitter/receiver don't get unnecessary power.
+  pinMode(RECEIVER_POWER_PIN, OUTPUT);
+  digitalWrite(RECEIVER_POWER_PIN, LOW);
+  pinMode(TRANSMITTER_POWER_PIN, OUTPUT);
+  digitalWrite(TRANSMITTER_POWER_PIN, LOW);
 
   // Setup program button behavior
   pinMode(PRG_PIN, INPUT);
@@ -66,12 +68,17 @@ void setup() {
   // Avoid false positive trigger  
   digitalWrite(PIR_PIN, LOW);
 
-  // Check and see if we find settings
+  // Setup Status led
+  pinMode(STATUS_LED, OUTPUT);
+  digitalWrite(STATUS_LED, LOW);
+
+  // Attempt to restore settings
   if (!checkSettings())
+    {
+      Serial.println("no settings found");
       digitalWrite(STATUS_LED, HIGH);
-    else
-      got_settings = true;
-      
+    }
+  
 }
 
 
@@ -81,6 +88,30 @@ void loop() {
   if (got_settings)
     checkTrigger();
 }
+
+void statusBlink(int num, int hold)
+{
+  for (int i=0; i < num; i++)
+  {
+    digitalWrite(STATUS_LED, HIGH);
+    delay(hold);
+    digitalWrite(STATUS_LED, LOW);
+    delay(hold);
+    }
+  }
+
+void sleep()
+{
+  attachInterrupt(interruptPin, wake, HIGH);
+  statusBlink(3, 30);
+  //Serial.println("Good night!");
+  LowPower.powerDown(SLEEP_FOREVER, ADC_OFF, BOD_OFF);
+  }
+
+void wake()
+{
+  //Serial.println("Good morning!");
+  }
 
 void saveData()
 {
@@ -108,6 +139,7 @@ bool checkSettings()
   if (settings.protocol == 0)
     return false;
 
+  got_settings = true;
   return true;
   }
   
@@ -117,21 +149,25 @@ void checkTrigger()
   static long time_buffer = 0;
   static bool reset_timer = false;
   
+  // Check if new trigger is outside of given time frame (TRIGGER_THRESHOLD) thus a new incindent
+  if ((millis() - last_trigger) >= TRIGGER_THRESHOLD)
+  {
+    Serial.print("Timeout");
+    sleep();
+    detachInterrupt(interruptPin);
+    statusBlink(5, 30);
+    time_buffer = 0;
+    reset_timer = true;
+    }
+    
   if (digitalRead(PIR_PIN)) {
 
-    // Check if new trigger is outside of given time frame (TRIGGER_THRESHOLD) thus a new incindent
-    if ((millis() - last_trigger) >= TRIGGER_THRESHOLD)
-    {
-      Serial.print("Trigger timed out. resetting buildup: ");
-      Serial.println(time_buffer);
-      time_buffer = 0;
-      reset_timer = true;
-      Serial.println(time_buffer);
-      }
-    
     // Check if we have activity over given time frame assuming a cat wants in 
     if (time_buffer >= TRIGGER_THRESHOLD)
     {
+      // Give power to transmitter
+      digitalWrite(TRANSMITTER_POWER_PIN, HIGH);
+  
       Serial.println("DING DONG!");
 
       Serial.print("bell code ");
@@ -150,6 +186,9 @@ void checkTrigger()
       // Reset timers
       time_buffer = 0;
       digitalWrite(STATUS_LED, LOW);
+
+      // Turn of power to transmitter
+      digitalWrite(TRANSMITTER_POWER_PIN, LOW);
     }
     // Increment time_buffer if just didn't reset timer
     else {
@@ -162,6 +201,7 @@ void checkTrigger()
     // Update last_trigger
     last_trigger = millis();
   }
+
 }
 
 bool copyKeys()
@@ -169,7 +209,7 @@ bool copyKeys()
   bool result = false;
   long counter = millis();
   mySwitch.disableTransmit();
-  digitalWrite(BOOST_POWER_PIN, HIGH);
+  digitalWrite(RECEIVER_POWER_PIN, HIGH);
   mySwitch.enableReceive(0);  // Receiver on inerrupt 0 => that is pin #2
 
   while ((millis() - counter) <= 5000)
@@ -197,29 +237,17 @@ bool copyKeys()
       }
     }
   mySwitch.disableReceive();
-  digitalWrite(BOOST_POWER_PIN, LOW);
+  digitalWrite(RECEIVER_POWER_PIN, LOW);
   return result;
   }
   
 void checkButtons(){
  switch (programButton.check()) {
    case Hold:
-     digitalWrite(STATUS_LED, LOW);
-     delay(200);
-     digitalWrite(STATUS_LED, HIGH);
-     delay(200);
-     digitalWrite(STATUS_LED, LOW);
+     statusBlink(2, 200);
      
      if (!copyKeys())
-     {
-       for (int i=0; i < 5; i++)
-        {
-          digitalWrite(STATUS_LED, HIGH);
-          delay(150);
-          digitalWrite(STATUS_LED, LOW);
-          delay(150);
-          }
-     }
+       statusBlink(5, 50);
      else
      {
        digitalWrite(STATUS_LED, HIGH);
