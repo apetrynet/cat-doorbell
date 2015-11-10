@@ -150,7 +150,7 @@ void checkTrigger()
   // Check if new trigger is outside of given time frame (TRIGGER_THRESHOLD) thus a new incindent
   if ((millis() - last_trigger) >= TRIGGER_THRESHOLD)
   {
-    Serial.print("Timeout");
+    Serial.print("Good night!");
     sleep();
     detachInterrupt(interruptPin);
     statusBlink(5, 30);
@@ -159,7 +159,6 @@ void checkTrigger()
     }
     
   if (digitalRead(PIR_PIN)) {
-
     new_trigger = true;
 
     // Check if we have activity over given time frame assuming a cat wants in 
@@ -170,37 +169,28 @@ void checkTrigger()
   
       Serial.println("DING DONG!");
 
-      Serial.print("bell code ");
-      Serial.println(settings.bell_code);
-      Serial.print("bit length ");
-      Serial.println(settings.bell_bit_length);
-      Serial.print("pulse length ");
-      Serial.println(settings.pulse_length);
-      Serial.print("protocol ");
-      Serial.println(settings.protocol);
-      
       // Ring door bell with code caught by copyKeys()
+      // Status LED is mostly for debugging to indicate transmission of doorbell
       digitalWrite(STATUS_LED, HIGH);
       mySwitch.send(settings.bell_code, settings.bell_bit_length);
       
-      // Reset timers
+      // Reset timer
       time_buffer = 0;
       digitalWrite(STATUS_LED, LOW);
 
-      // Turn of power to transmitter
+      // Turn of power to transmitter/receiver
       digitalWrite(POWER_PIN, LOW);
     }
-    // Increment time_buffer if just didn't reset timer
+    // Increment time_buffer if reset_timer is false and we're sure we have a new trigger
     else {
       if (!reset_timer && new_trigger)
         time_buffer += (millis() - last_trigger);
-      else
+      else if (reset_timer)
         reset_timer = false;
     }
 
     // Update last_trigger
     last_trigger = millis();
-
   }
   // if PIR_PIN is LOW
   else
@@ -211,10 +201,12 @@ bool copyKeys()
 {
   bool result = false;
   long counter = millis();
-  mySwitch.disableTransmit();
-  digitalWrite(POWER_PIN, HIGH);
+  
   mySwitch.enableReceive(0);  // Receiver on inerrupt 0 => that is pin #2
+  digitalWrite(POWER_PIN, HIGH);
 
+  statusBlink(2, 200); // To indicate that we're ready for programming
+     
   while ((millis() - counter) <= 5000)
   {
     if (mySwitch.available())
@@ -239,16 +231,18 @@ bool copyKeys()
       break;
       }
     }
+
   mySwitch.disableReceive();
   digitalWrite(POWER_PIN, LOW);
+
   return result;
   }
   
 void checkButtons(){
  switch (programButton.check()) {
    case Hold:
-     statusBlink(2, 200);
-     
+     mySwitch.disableTransmit();
+
      if (!copyKeys())
        statusBlink(5, 50);
      else
@@ -256,8 +250,8 @@ void checkButtons(){
        digitalWrite(STATUS_LED, HIGH);
        got_settings = true;
        saveData();
-       digitalWrite(STATUS_LED, LOW);
        mySwitch.enableTransmit(TRANSMIT_PIN);
+       digitalWrite(STATUS_LED, LOW);
        time_buffer = 0;
      }
      break;
