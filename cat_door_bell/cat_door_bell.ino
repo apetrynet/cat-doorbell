@@ -15,8 +15,8 @@ unsigned short interruptPin = digitalPinToInterrupt(PIR_PIN);
 
 // TRIGGER_THRESHOLD sets how long we should wait before we trigger the door bell
 // A human (with good intensions:) would probably have pushed the button by now
-//const long TRIGGER_THRESHOLD = 30000; //30 seconds for development
-const long TRIGGER_THRESHOLD = 90000; // 1.5 minutes
+const long TRIGGER_THRESHOLD = 30000; //30 seconds for development
+//const long TRIGGER_THRESHOLD = 90000; // 1.5 minutes
 
 // timer variables
 long last_trigger = 0;
@@ -62,9 +62,6 @@ void setup() {
   // Make sure we READ from the sensor
   pinMode(PIR_PIN, INPUT);
 
-  // Avoid false positive trigger  
-  digitalWrite(PIR_PIN, LOW);
-
   // Setup Status led
   pinMode(STATUS_LED, OUTPUT);
   digitalWrite(STATUS_LED, LOW);
@@ -75,6 +72,9 @@ void setup() {
       Serial.println("no settings found");
       digitalWrite(STATUS_LED, HIGH);
     }
+  else
+    // Confirm we have valid settings
+    ringDoorbell();
   
 }
 
@@ -139,7 +139,26 @@ bool checkSettings()
   got_settings = true;
   return true;
   }
+
+void ringDoorbell()
+{
+  // Give power to transmitter/receiver
+  digitalWrite(POWER_PIN, HIGH);
+
+  // Debug
+  Serial.println("DING DONG!");
+      
+  // Ring door bell with code caught by copyKeys()
+  // Status LED is mostly for debugging to indicate transmission of doorbell
+  digitalWrite(STATUS_LED, HIGH);
+  mySwitch.send(settings.bell_code, settings.bell_bit_length);
+  digitalWrite(STATUS_LED, LOW);
+
+  // Turn of power to transmitter/receiver
+  digitalWrite(POWER_PIN, LOW);
   
+  }
+
 void checkTrigger()
 {
   static long last_trigger = millis();
@@ -164,22 +183,11 @@ void checkTrigger()
     // Check if we have activity over given time frame assuming a cat wants in 
     if (time_buffer >= TRIGGER_THRESHOLD)
     {
-      // Give power to transmitter
-      digitalWrite(POWER_PIN, HIGH);
-  
-      Serial.println("DING DONG!");
-
-      // Ring door bell with code caught by copyKeys()
-      // Status LED is mostly for debugging to indicate transmission of doorbell
-      digitalWrite(STATUS_LED, HIGH);
-      mySwitch.send(settings.bell_code, settings.bell_bit_length);
+      ringDoorbell();
       
       // Reset timer
       time_buffer = 0;
-      digitalWrite(STATUS_LED, LOW);
-
-      // Turn of power to transmitter/receiver
-      digitalWrite(POWER_PIN, LOW);
+      
     }
     // Increment time_buffer if reset_timer is false and we're sure we have a new trigger
     else {
@@ -252,6 +260,10 @@ void checkButtons(){
        saveData();
        mySwitch.enableTransmit(TRANSMIT_PIN);
        digitalWrite(STATUS_LED, LOW);
+       
+       // Test our newly stored settings and ring the bell
+       ringDoorbell();
+       
        time_buffer = 0;
      }
      break;
