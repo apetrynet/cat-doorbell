@@ -33,3 +33,6 @@ Hold down program button until status led blinks twice. You now have 5 seconds t
 * 1 433.92Mhz Transmitter
 * 1 433.92Mhz Receiver
 
+## Notes
+To save power and run the cat-dorbell on two AA batteries you'll have to [bypass the 5v](http://randomnerdtutorials.com/modifying-cheap-pir-motion-sensor-to-work-at-3-3v/) regulator on the motion sensor board.<br> 
+The transistor gives power to the booster which in turn powers the transmitter and receiver.
