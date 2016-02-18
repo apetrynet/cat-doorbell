@@ -1,5 +1,5 @@
 # cat-doorbell
-Wireless, Programmable, Arduino based, motion triggered doorbell
+Wireless, Programmable, Arduino based, motion triggered doorbell for cats!
 <br>
 <br>
 Copy your regular 433Mhz doorbell clicker's signal with a push of a button.<br>
@@ -18,7 +18,8 @@ The cat-doorbell will go to sleep if no movement is detected within the time fra
 * Five flashes - Timeout or failure to copy signal
 
 ## Programming
-Hold down program button until status led flashes twice. You now have 5 seconds to push your regular doorbell clicker. The status led will flash five times if it times out and once if it succeeded.
+Hold down program button until status led flashes twice. You now have 5 seconds to push your regular doorbell clicker. The status led will flash five times if it times out and once if it succeeded.<br>
+When successfully programed the cat-dorbell will ring after a seconds delay to confirm valid ring code is stored.
 
 ## Hardware (BOM)
 * 1 Arduino/ATMega328P
@@ -32,6 +33,11 @@ Hold down program button until status led flashes twice. You now have 5 seconds 
 * 1 2AA Battery pack
 * 1 HC-SR501 PIR motion sensor
 * 1 5V DC-DC booster
-* 1 433.92Mhz Transmitter
-* 1 433.92Mhz Receiver
+* 1 433.92Mhz Transmitter (with antenna)
+* 1 433.92Mhz Receiver (with antenna)
+* Male/Female Headers
 
+## Successfully tested doorbell models
+Please submit any models that work for you.
+
+* Clas Ohlson - Silver Line (36-4832)
