@@ -5,7 +5,7 @@ Wireless, Programmable, Arduino based, motion triggered doorbell for cats!
 Copy your regular 433Mhz doorbell clicker's signal with a push of a button.<br>
 When programmed with a call signal, the cat-doorbell will ring the bell after motion is detected within a one minute window.<br>
 The grace period is to avoid the bell ringing every time something/someone moves in front of the motion sensor. A cat that would like to get in will hang around for a while triggering the doorbell.<br>
-The cat-doorbell will go to sleep if no movement is detected within the time frame. Motion will wake it again.
+The cat-doorbell will go to sleep if no movement is detected within the time frame to save power. Motion will wake it again.
 
 ## Status indicator during usage
 * Constant flashing - You need to [program](#programming) the cat-doorbell
