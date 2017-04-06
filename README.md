@@ -22,7 +22,7 @@ Hold down program button until status led flashes twice. You now have 5 seconds 
 When successfully programed the cat-dorbell will ring after a seconds delay to confirm valid ring code is stored.
 
 ## Schema
-I'll add aschema of the board so people actually can create this.
+I'll add a schema of the board so people actually can create this.
 
 ## Hardware (BOM)
 * 1 Arduino/ATMega328P
