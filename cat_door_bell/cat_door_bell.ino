@@ -16,8 +16,16 @@ const unsigned short interruptPin = digitalPinToInterrupt(PIR_PIN);
 
 // TRIGGER_THRESHOLD sets how long we should wait before we trigger the door bell
 // A human (with good intensions:) would probably have pushed the button by now
-//const long TRIGGER_THRESHOLD = 30000; //30 seconds for development
-const long TRIGGER_THRESHOLD = 60000; // 1 minute
+const long TRIGGER_THRESHOLD = 20000; // 20 seconds
+
+// Amount of censecutive triggers before snooze. For trigger happy PIR sensors
+// reacting to the sun or for when your cat needs some time to settle.
+// Set ANNOYANCE_LEVEL to -1 if you don't want to use the snooze feature
+const int ANNOYANCE_LEVEL = 3;
+const long SNOOZE_TIME = 60000 * 15; // 15 minutes
+bool snoozing = false;
+long snooze_counter;
+int number_of_calls = 0;
 
 // Library for sending/receiving RF signals
 RCSwitch mySwitch = RCSwitch();
@@ -65,7 +73,7 @@ void setup() {
   programButton.assign(PRG_PIN);
   programButton.setMode(OneShotTimer);
   programButton.setTimer(1500);
-  
+
   // Make sure we READ from the sensor
   pinMode(PIR_PIN, INPUT);
   digitalWrite(PIR_PIN, LOW);
@@ -86,7 +94,7 @@ void loop() {
     if (!checkSettings())
       statusBlink(1, 100);
   }
-  
+
   checkButtons();
 
   if (got_settings)
@@ -132,7 +140,7 @@ bool checkSettings()
 
   if (settings.magic != 42)
     return false;
-    
+
   got_settings = true;
   return got_settings;
   }
@@ -141,11 +149,11 @@ bool copyKeys()
 {
   bool result = false;
   long counter = millis();
-  
+
   digitalWrite(RCV_POWER_PIN, HIGH);
 
   statusBlink(2, 200); // To indicate that we're ready for programming
-     
+
   while ((millis() - counter) <= 5000) {
     if (mySwitch.available()) {
       resetSettings();
@@ -158,10 +166,10 @@ bool copyKeys()
 
       // Bell bit length
       settings.bell_bit_length = mySwitch.getReceivedBitlength();
-      
+
       // Pulse length.
       settings.pulse_length = mySwitch.getReceivedDelay();
-      
+
       saveData();
 
       mySwitch.resetAvailable();
@@ -175,14 +183,14 @@ bool copyKeys()
 
   return result;
   }
-  
+
 void checkButtons(){
  switch (programButton.check()) {
    case Hold:
 
      if (!copyKeys())
        statusBlink(5, 50);
-       
+
      else {
        // Test our newly stored settings and ring the bell
        loadData();
@@ -190,7 +198,7 @@ void checkButtons(){
        ringDoorbell();
      }
      break;
-     
+
    default:
      break;
   }
@@ -213,24 +221,46 @@ void checkTrigger()
     loadData();
     time_buffer = 0;
     reset_timer = true;
+    // Reset snooze settings
+    snoozing = false;
+    number_of_calls = 0;
     }
-    
+
   // Check if new trigger is outside of given time frame (TRIGGER_THRESHOLD) thus a new incindent
   if (digitalRead(PIR_PIN)) {
     if (!new_trigger)
       new_trigger = true;
 
-    // Check if we have activity over given time frame assuming a cat wants in 
-    if (time_buffer >= TRIGGER_THRESHOLD)
-    {
-      ringDoorbell();
-      
+    // Check if we have activity over given time frame assuming a cat wants in
+    if (time_buffer >= TRIGGER_THRESHOLD){
       // Reset timer
       time_buffer = 0;
-      
-    }
+
+      // If forever tolerant never snooze
+      if (ANNOYANCE_LEVEL == -1){
+        ringDoorbell();
+
+      // If not snoozing we ring the doorbell
+      } else if (number_of_calls < ANNOYANCE_LEVEL && !snoozing){
+        ringDoorbell();
+
+        // Count consecutive calls
+        number_of_calls += 1;
+
+      // First time we reach snooze threshold
+      } else if (number_of_calls == ANNOYANCE_LEVEL){
+        number_of_calls = 0;
+        snooze_counter = millis();
+        snoozing = true;
+        //statusBlink(3, 500);
+
+      // Enough snoozing. Get active again
+      } else if (millis() - snooze_counter >= SNOOZE_TIME){
+          snoozing = false;
+      }
+
     // Increment time_buffer if reset_timer is false and we're sure we have a new trigger
-    else {
+    } else {
       if (!reset_timer && new_trigger)
         time_buffer += (millis() - last_trigger);
       else if (reset_timer)
@@ -260,7 +290,7 @@ void ringDoorbell()
 {
   // Give power to transmitter/receiver
   digitalWrite(TR_POWER_PIN, HIGH);
-  
+
   // Status LED is mostly for debugging to indicate transmission of doorbell
   digitalWrite(STATUS_LED, HIGH);
 
@@ -274,7 +304,7 @@ void ringDoorbell()
   Serial.print("pulse length ");
   Serial.println(settings.pulse_length);
   Serial.print("protocol ");
-  Serial.println(settings.protocol);    
+  Serial.println(settings.protocol);
   */
   // Ring door bell with code caught by copyKeys()
   mySwitch.send(settings.bell_code, settings.bell_bit_length);
@@ -282,7 +312,7 @@ void ringDoorbell()
 
   // Turn of power to transmitter/receiver
   digitalWrite(TR_POWER_PIN, LOW);
-  
+
   }
 
 void sleep()
@@ -297,5 +327,3 @@ void wake()
 {
   //Serial.println("Good morning!");
   }
-
-
