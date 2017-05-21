@@ -21,6 +21,9 @@ The cat-doorbell will go to sleep if no movement is detected within the time fra
 Hold down program button until status led flashes twice. You now have 5 seconds to push your regular doorbell clicker. The status led will flash five times if it times out and once if it succeeded.<br>
 When successfully programed the cat-dorbell will ring after a seconds delay to confirm valid ring code is stored.
 
+## Schema
+I'll add a schema of the board so people actually can create this.
+
 ## Hardware (BOM)
 * 1 Arduino/ATMega328P
 * 1 16Mhz Crystal
