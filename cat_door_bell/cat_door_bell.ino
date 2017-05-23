@@ -221,6 +221,7 @@ void checkTrigger()
     loadData();
     time_buffer = 0;
     reset_timer = true;
+    
     // Reset snooze settings
     snoozing = false;
     number_of_calls = 0;
@@ -248,7 +249,7 @@ void checkTrigger()
         number_of_calls += 1;
 
       // First time we reach snooze threshold
-      } else if (number_of_calls == ANNOYANCE_LEVEL){
+      } else if (number_of_calls == ANNOYANCE_LEVEL - 1){
         number_of_calls = 0;
         snooze_counter = millis();
         snoozing = true;
